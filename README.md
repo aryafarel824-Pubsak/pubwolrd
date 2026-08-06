@@ -1,2 +1,0 @@
-# pubwolrd
-Bantu belajar bahasa? 

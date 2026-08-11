@@ -16,6 +16,7 @@
     --text:#eceef1;
     --text-muted:#868d98;
     --accent:#5089b5;
+    --accent-2:#6ea6cf;
     --accent-dim:#5089b533;
     --correct:#5fa776;
     --correct-dim:#5fa77622;
@@ -100,7 +101,7 @@
   .track-fill{
     position:absolute;
     left:0; top:0; bottom:0;
-    background:linear-gradient(90deg,var(--accent),#6ea6cf);
+    background:linear-gradient(90deg,var(--accent),var(--accent-2));
     border-radius:3px;
     transition:width .35s ease;
   }
@@ -314,6 +315,83 @@
 
   ::-webkit-scrollbar{ width:6px; }
   ::-webkit-scrollbar-thumb{ background:var(--line); border-radius:3px; }
+
+  /* ---------- theme swatches (setup screen) ---------- */
+  .theme-label{ font-size:12px; color:var(--text-muted); font-family:'IBM Plex Mono',monospace; letter-spacing:.03em; margin-top:2px; }
+  .theme-row{ display:flex; gap:12px; flex-wrap:wrap; }
+  .swatch{
+    width:34px; height:34px;
+    border-radius:50%;
+    cursor:pointer;
+    border:2px solid transparent;
+    box-shadow:0 0 0 1px var(--line);
+    transition:transform .15s, box-shadow .15s;
+  }
+  .swatch:active{ transform:scale(0.94); }
+  .swatch.active{
+    border-color:var(--text);
+    box-shadow:0 0 0 1px var(--text);
+    transform:scale(1.08);
+  }
+
+  /* ---------- menu screen ---------- */
+  .menu{ flex:1; display:flex; flex-direction:column; justify-content:center; gap:26px; }
+  .menu h1{ font-family:'Space Grotesk',sans-serif; font-size:22px; margin:0 0 2px; }
+  .section-label{ font-size:12px; color:var(--text-muted); font-family:'IBM Plex Mono',monospace; text-transform:uppercase; letter-spacing:.04em; margin-bottom:10px; }
+  .mode-list{ display:flex; flex-direction:column; gap:10px; }
+  .mode-card{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:16px 18px;
+    cursor:pointer;
+    transition:border-color .15s, background .15s;
+  }
+  .mode-card.active{ border-color:var(--accent); background:var(--accent-dim); }
+  .mode-card .mt{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:15px; }
+  .mode-card .md{ font-size:12.5px; color:var(--text-muted); margin-top:4px; line-height:1.5; }
+
+  .stepper-row{ display:flex; align-items:center; justify-content:center; gap:20px; }
+  .stepper-btn{
+    width:46px; height:46px;
+    border-radius:12px;
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    color:var(--text);
+    font-size:20px;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    user-select:none;
+  }
+  .stepper-btn:active{ background:var(--line); }
+  .stepper-btn:disabled{ opacity:.3; cursor:not-allowed; }
+  .stepper-value{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:22px;
+    min-width:44px;
+    text-align:center;
+  }
+
+  /* ---------- artikel choice control (replaces text input in Tebak Artikel mode) ---------- */
+  .artikel-choices{ display:flex; gap:8px; height:52px; }
+  .artikel-btn{
+    flex:1;
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    color:var(--text);
+    border-radius:14px;
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:14px;
+    cursor:pointer;
+    transition:border-color .15s, background .15s;
+  }
+  .artikel-btn.picked{ border-color:var(--accent); background:var(--accent-dim); }
+  .artikel-btn.is-correct{ border-color:var(--correct); background:var(--correct-dim); }
+  .artikel-btn.is-wrong{ border-color:var(--wrong); background:var(--wrong-dim); }
+  .artikel-btn:disabled{ cursor:not-allowed; }
+
+  .answer-input, .nav-btn, .artikel-choices{ height:52px; }
 </style>
 </head>
 <body>
@@ -346,14 +424,39 @@
   }
 
   /* ============================================================
+     THEME PRESETS — inline switch on the Setup screen only.
+     Not persisted: every fresh load starts on "Biru Autobahn".
+     ============================================================ */
+  const THEMES = [
+    { id:'autobahn', name:'Biru Autobahn',    accent:'#5089b5', accent2:'#6ea6cf' },
+    { id:'marun',    name:'Merah Marun',      accent:'#9c4f5a', accent2:'#c17883' },
+    { id:'zamrud',   name:'Hijau Zamrud',     accent:'#4f8a6d', accent2:'#72ad8f' },
+    { id:'tembaga',  name:'Amber Tembaga',    accent:'#b8874a', accent2:'#d1a672' },
+    { id:'plum',     name:'Ungu Plum',        accent:'#7d5a8c', accent2:'#a17fb0' },
+    { id:'slate',    name:'Slate Monokrom',   accent:'#7a828e', accent2:'#9aa1ac' }
+  ];
+
+  function applyTheme(themeId){
+    const t = THEMES.find(x => x.id === themeId) || THEMES[0];
+    const root2 = document.documentElement.style;
+    root2.setProperty('--accent', t.accent);
+    root2.setProperty('--accent-2', t.accent2);
+    root2.setProperty('--accent-dim', t.accent + '33');
+  }
+
+  /* ============================================================
      STATE
      ============================================================ */
   const state = {
-    screen: 'loading',      // loading | setup | quiz | result
+    screen: 'loading',      // loading | setup | menu | quiz | result
     sheetUrl: null,
+    theme: 'autobahn',
     pool: [],                // full validated vocab pool [{artikel, worter, plural, arti}]
+    menu: { mode: 'arti', count: 5 }, // current selection on the mode-select screen
+    lastRoundConfig: null,   // { mode, count } of the most recent menu-started round
     round: {
       type: 'random',        // 'random' | 'retry'
+      mode: 'arti',           // 'arti' | 'artikel'
       items: [],              // locked question list for this round
       index: 0,
       userInputs: [],          // string per question
@@ -481,9 +584,10 @@
     return a;
   }
 
-  function startRound(type, items){
+  function startRound(type, items, mode){
     state.round = {
       type,
+      mode,
       items,
       index: 0,
       userInputs: new Array(items.length).fill(''),
@@ -495,24 +599,37 @@
     render();
   }
 
-  function startRandomRound(){
-    const size = Math.min(20, state.pool.length);
+  function startRandomRound(mode, count){
+    const size = Math.min(count, state.pool.length);
     const items = shuffle(state.pool).slice(0, size);
-    startRound('random', items);
+    state.lastRoundConfig = { mode, count };
+    startRound('random', items, mode);
   }
 
   function startRetryRound(wrongItems){
-    startRound('retry', shuffle(wrongItems));
+    // inherits the mode of the round that was just finished
+    startRound('retry', shuffle(wrongItems), state.round.mode);
   }
 
   function normalizeAnswer(s){
     return (s || '').toString().trim().replace(/\s+/g, ' ').toLowerCase();
   }
 
+  // A cell like "Der/Das" means either article is accepted as correct.
+  function splitArtikelOptions(artikelStr){
+    return (artikelStr || '').split('/').map(s => normalizeAnswer(s)).filter(Boolean);
+  }
+
   function checkCurrent(){
     const i = state.round.index;
     const item = state.round.items[i];
-    const isCorrect = normalizeAnswer(state.round.userInputs[i]) === normalizeAnswer(item.arti);
+    let isCorrect;
+    if(state.round.mode === 'artikel'){
+      const options = splitArtikelOptions(item.artikel);
+      isCorrect = options.includes(normalizeAnswer(state.round.userInputs[i]));
+    }else{
+      isCorrect = normalizeAnswer(state.round.userInputs[i]) === normalizeAnswer(item.arti);
+    }
     state.round.checked[i] = true;
     state.round.correctFlags[i] = isCorrect;
     return isCorrect;
@@ -535,6 +652,7 @@
   function render(){
     if(state.screen === 'loading') return renderLoading();
     if(state.screen === 'setup') return renderSetup();
+    if(state.screen === 'menu') return renderMenu();
     if(state.screen === 'quiz') return renderQuiz();
     if(state.screen === 'result') return renderResult();
   }
@@ -552,6 +670,12 @@
 
   function renderSetup(){
     const err = state.loadError ? `<div class="error-box">${state.loadError}</div>` : '';
+    const swatches = THEMES.map(t => `
+      <div class="swatch ${state.theme === t.id ? 'active' : ''}"
+           style="background:${t.accent}"
+           data-theme="${t.id}"
+           title="${t.name}"></div>
+    `).join('');
     root.innerHTML = `
       <div class="topbar">
         <div class="wordmark">Vokabeln<span class="dot">.</span></div>
@@ -561,10 +685,21 @@
         <p>Tempel link Google Sheets kosakatamu (kolom: Artikel, Worter, Plural, Arti). Pastikan sharing diatur ke "Anyone with the link — Viewer".</p>
         <input id="sheet-url-input" type="text" placeholder="https://docs.google.com/spreadsheets/d/..." value="${state.sheetUrl ? state.sheetUrl.replace(/"/g,'&quot;') : ''}">
         ${err}
+        <div>
+          <div class="theme-label">WARNA TEMA</div>
+          <div class="theme-row" id="theme-row" style="margin-top:8px;">${swatches}</div>
+        </div>
         <button class="primary-btn" id="connect-btn">Hubungkan &amp; Mulai</button>
       </div>
     `;
     document.getElementById('connect-btn').onclick = onConnect;
+    document.querySelectorAll('#theme-row .swatch').forEach(el => {
+      el.onclick = () => {
+        state.theme = el.getAttribute('data-theme');
+        applyTheme(state.theme);
+        renderSetup(); // re-render just to update the active ring
+      };
+    });
   }
 
   async function onConnect(){
@@ -579,7 +714,8 @@
       state.sheetUrl = url;
       state.loadError = null;
       await saveConfig({ sheetUrl: url });
-      startRandomRound();
+      state.screen = 'menu';
+      render();
     }catch(e){
       state.loadError = 'Gagal memuat data: ' + e.message + '. Cek link dan pengaturan share-nya, lalu coba lagi.';
       state.screen = 'setup';
@@ -587,28 +723,117 @@
     }
   }
 
+  const MODES = [
+    { id:'arti',    title:'🔤 Tebak Arti',    desc:'Lihat kata Jerman, jawab artinya dalam Bahasa Indonesia.' },
+    { id:'artikel', title:'📖 Tebak Artikel', desc:'Lihat kata Jerman, tebak artikelnya: Der, Die, atau Das.' }
+  ];
+
+  function renderMenu(){
+    const modeCards = MODES.map(m => `
+      <div class="mode-card ${state.menu.mode === m.id ? 'active' : ''}" data-mode="${m.id}">
+        <div class="mt">${m.title}</div>
+        <div class="md">${m.desc}</div>
+      </div>
+    `).join('');
+
+    const maxCount = Math.min(20, state.pool.length);
+    const minCount = Math.min(5, maxCount);
+    if(state.menu.count > maxCount) state.menu.count = maxCount;
+    if(state.menu.count < minCount) state.menu.count = minCount;
+
+    root.innerHTML = `
+      <div class="topbar">
+        <div class="wordmark">Vokabeln<span class="dot">.</span></div>
+        <div class="badge">${state.pool.length} kata tersedia</div>
+      </div>
+      <div class="menu">
+        <div>
+          <div class="section-label">Pilih Mode</div>
+          <div class="mode-list" id="mode-list">${modeCards}</div>
+        </div>
+        <div>
+          <div class="section-label" style="text-align:center;">Jumlah Kata</div>
+          <div class="stepper-row">
+            <button class="stepper-btn" id="count-minus" ${state.menu.count <= minCount ? 'disabled' : ''}>−</button>
+            <div class="stepper-value" id="count-value">${state.menu.count}</div>
+            <button class="stepper-btn" id="count-plus" ${state.menu.count >= maxCount ? 'disabled' : ''}>+</button>
+          </div>
+        </div>
+        <button class="primary-btn" id="start-quiz-btn" ${!state.menu.mode ? 'disabled' : ''}>Mulai Kuis</button>
+      </div>
+    `;
+
+    document.querySelectorAll('#mode-list .mode-card').forEach(el => {
+      el.onclick = () => {
+        state.menu.mode = el.getAttribute('data-mode');
+        renderMenu();
+      };
+    });
+
+    document.getElementById('count-minus').onclick = () => {
+      state.menu.count = Math.max(minCount, state.menu.count - 5);
+      renderMenu();
+    };
+    document.getElementById('count-plus').onclick = () => {
+      state.menu.count = Math.min(maxCount, state.menu.count + 5);
+      renderMenu();
+    };
+
+    document.getElementById('start-quiz-btn').onclick = () => {
+      startRandomRound(state.menu.mode, state.menu.count);
+    };
+  }
+
   function renderQuiz(){
-    const { items, index, userInputs, checked, correctFlags } = state.round;
+    const { items, index, userInputs, checked, correctFlags, mode } = state.round;
     const total = items.length;
     const item = items[index];
     const pct = ((index) / total) * 100;
     const isChecked = checked[index];
     const isLast = index === total - 1;
+    const isArtikelMode = mode === 'artikel';
 
     let ticks = '';
     for(let t = 1; t < total; t++){ ticks += `<div class="tick" style="width:1px"></div>`; }
 
-    const inputClass = isChecked ? (correctFlags[index] ? 'correct' : 'wrong') : '';
+    // Hint always reveals whatever ISN'T the answer for the current mode:
+    // arti-mode hints the artikel, artikel-mode hints the arti (meaning).
+    const hintValue = isArtikelMode ? item.arti : item.artikel;
+    const hintLabel = isArtikelMode ? 'tampilkan arti' : 'tampilkan artikel';
+
     const feedbackHtml = isChecked
       ? (correctFlags[index]
           ? `<div class="feedback correct">Benar ✓</div>`
-          : `<div class="feedback wrong">Kurang tepat — jawaban: <strong>${item.arti}</strong></div>`)
+          : `<div class="feedback wrong">Kurang tepat — jawaban: <strong>${isArtikelMode ? item.artikel : item.arti}</strong></div>`)
       : `<div class="feedback"></div>`;
+
+    // ---- middle control: text input (arti mode) or 3 buttons (artikel mode)
+    let middleControlHtml;
+    if(isArtikelMode){
+      const correctOptions = splitArtikelOptions(item.artikel);
+      const picked = userInputs[index];
+      middleControlHtml = `
+        <div class="artikel-choices">
+          ${['Der','Die','Das'].map(label => {
+            let cls = '';
+            if(picked === label) cls += ' picked';
+            if(isChecked){
+              if(correctOptions.includes(normalizeAnswer(label))) cls += ' is-correct';
+              else if(picked === label) cls += ' is-wrong';
+            }
+            return `<button class="artikel-btn${cls}" data-artikel="${label}" ${isChecked ? 'disabled' : ''}>${label}</button>`;
+          }).join('')}
+        </div>
+      `;
+    }else{
+      const inputClass = isChecked ? (correctFlags[index] ? 'correct' : 'wrong') : '';
+      middleControlHtml = `<input class="answer-input ${inputClass}" id="answer-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="artinya…" value="${(userInputs[index]||'').replace(/"/g,'&quot;')}">`;
+    }
 
     root.innerHTML = `
       <div class="topbar">
         <div class="wordmark">Vokabeln<span class="dot">.</span></div>
-        <div class="badge">${state.round.type === 'retry' ? 'ULANGI YANG SALAH' : 'SESI ACAK'}</div>
+        <div class="badge">${state.round.type === 'retry' ? 'ULANGI YANG SALAH' : 'SESI ACAK'} · ${isArtikelMode ? 'ARTIKEL' : 'ARTI'}</div>
       </div>
 
       <div class="route">
@@ -624,27 +849,36 @@
 
       <div class="stage">
         <div class="card">
-          <div class="artikel" id="artikel-hint">${state.hintUsed ? (item.artikel || '&nbsp;') : '&nbsp;'}</div>
+          <div class="artikel" id="hint-line">${state.hintUsed ? (hintValue || '&nbsp;') : '&nbsp;'}</div>
           <div class="word">${item.worter}</div>
           ${item.plural ? `<div class="plural">Plural: ${item.plural}</div>` : ''}
           ${feedbackHtml}
         </div>
         <div class="hint-row">
-          <button class="hint-btn" id="hint-btn" ${state.hintUsed ? 'disabled' : ''}>${state.hintUsed ? '' : 'tampilkan artikel'}</button>
+          <button class="hint-btn" id="hint-btn" ${state.hintUsed ? 'disabled' : ''}>${state.hintUsed ? '' : hintLabel}</button>
         </div>
       </div>
 
       <div class="controls">
         <button class="nav-btn" id="prev-btn" ${index === 0 ? 'disabled' : ''}>‹</button>
-        <input class="answer-input ${inputClass}" id="answer-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="artinya…" value="${(userInputs[index]||'').replace(/"/g,'&quot;')}">
+        ${middleControlHtml}
         <button class="nav-btn" id="next-btn">${isLast ? '✓' : '›'}</button>
       </div>
     `;
 
-    const answerInput = document.getElementById('answer-input');
-    answerInput.oninput = (e) => { state.round.userInputs[index] = e.target.value; };
-    answerInput.onkeydown = (e) => { if(e.key === 'Enter') document.getElementById('next-btn').click(); };
-    setTimeout(() => answerInput.focus(), 0);
+    if(isArtikelMode){
+      document.querySelectorAll('.artikel-btn').forEach(btn => {
+        btn.onclick = () => {
+          state.round.userInputs[index] = btn.getAttribute('data-artikel');
+          render();
+        };
+      });
+    }else{
+      const answerInput = document.getElementById('answer-input');
+      answerInput.oninput = (e) => { state.round.userInputs[index] = e.target.value; };
+      answerInput.onkeydown = (e) => { if(e.key === 'Enter') document.getElementById('next-btn').click(); };
+      setTimeout(() => answerInput.focus(), 0);
+    }
 
     document.getElementById('prev-btn').onclick = () => {
       state.round.index = Math.max(0, index - 1);
@@ -670,20 +904,24 @@
   }
 
   function renderResult(){
-    const { items, correctFlags, userInputs } = state.round;
+    const { items, correctFlags, userInputs, mode } = state.round;
+    const isArtikelMode = mode === 'artikel';
     const total = items.length;
     const correct = correctFlags.filter(Boolean).length;
     const wrongItems = items.filter((it, i) => !correctFlags[i]);
+    const cfg = state.lastRoundConfig || { mode, count: total };
 
     let reviewHtml = '';
     if(wrongItems.length){
       reviewHtml = `<div class="review-title">Yang perlu diulang</div><div class="review">` +
         items.map((it, i) => {
           if(correctFlags[i]) return '';
+          const ra = isArtikelMode ? (userInputs[i] || '(kosong)') : (userInputs[i] ? userInputs[i] : '(kosong)');
+          const rc = isArtikelMode ? it.artikel : it.arti;
           return `<div class="review-item">
             <div class="rw">${it.worter}</div>
-            <div class="ra">jawabanmu: ${userInputs[i] ? userInputs[i] : '(kosong)'}</div>
-            <div class="rc">seharusnya: ${it.arti}</div>
+            <div class="ra">jawabanmu: ${ra}</div>
+            <div class="rc">seharusnya: ${rc}</div>
           </div>`;
         }).join('') +
       `</div>`;
@@ -701,18 +939,26 @@
         </div>
         ${reviewHtml}
         <div class="result-actions">
-          ${state.pool.length >= 1 ? `<button class="primary-btn" id="new-round-btn">20 Kata Baru</button>` : ''}
+          ${state.pool.length >= 1 ? `<button class="primary-btn" id="new-round-btn">${cfg.count} Kata Baru</button>` : ''}
           ${wrongItems.length ? `<button class="ghost-btn" id="retry-wrong-btn">Ulangi yang Salah (${wrongItems.length})</button>` : ''}
+          <button class="ghost-btn" id="change-mode-btn">Ganti Mode</button>
           <button class="ghost-btn" id="done-btn">Selesai</button>
         </div>
       </div>
     `;
 
     const newRoundBtn = document.getElementById('new-round-btn');
-    if(newRoundBtn) newRoundBtn.onclick = () => startRandomRound();
+    if(newRoundBtn) newRoundBtn.onclick = () => startRandomRound(cfg.mode, cfg.count);
 
     const retryBtn = document.getElementById('retry-wrong-btn');
     if(retryBtn) retryBtn.onclick = () => startRetryRound(wrongItems);
+
+    document.getElementById('change-mode-btn').onclick = () => {
+      state.menu.mode = cfg.mode;
+      state.menu.count = cfg.count;
+      state.screen = 'menu';
+      render();
+    };
 
     document.getElementById('done-btn').onclick = () => renderClosing(correct, total);
   }
@@ -739,13 +985,17 @@
         </div>
       </div>
     `;
-    document.getElementById('restart-btn').onclick = () => startRandomRound();
+    document.getElementById('restart-btn').onclick = () => {
+      state.screen = 'menu';
+      render();
+    };
   }
 
   /* ============================================================
      BOOT
      ============================================================ */
   async function boot(){
+    applyTheme(state.theme); // always starts on Biru Autobahn — theme is not persisted
     state.screen = 'loading';
     render();
     const cfg = await loadConfig();
@@ -754,7 +1004,8 @@
         const pool = await fetchPool(cfg.sheetUrl);
         state.pool = pool;
         state.sheetUrl = cfg.sheetUrl;
-        startRandomRound();
+        state.screen = 'menu';
+        render();
         return;
       }catch(e){
         state.loadError = 'Gagal memuat data tersimpan: ' + e.message + '. Masukkan link lagi.';
